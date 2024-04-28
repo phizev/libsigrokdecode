@@ -44,7 +44,7 @@ class Decoder(srd.Decoder):
     license = 'gplv2+'
     inputs = ['uart']
     outputs = []
-    tags = []
+    tags = ['Embedded/industrial', 'IR']
     channels = (
         {'id': 'command', 'name': 'Command', 'desc': 'Commands sent to the ScopeMeter'},
         {'id': 'response', 'name': 'Response', 'desc': 'Responses from the ScopeMeter'},
@@ -236,7 +236,7 @@ class Decoder(srd.Decoder):
         if self.cmd_v_present():
             rx_items = ({
                             'name': 'Measurement value',
-                        })
+                        },)
         else:
             rx_items = ({
                             'name': 'Measurement type',
@@ -251,8 +251,8 @@ class Decoder(srd.Decoder):
         comma = 44
         i = 0
         for item in args:
-            if item['data'][0] == comma and \
-                    (len(ann) == 0 or ann[i]['type'] != 'separator'):
+            if (item['data'][0] == comma and
+                    (len(ann) == 0 or ann[i]['type'] != 'separator')):
                 i += 1
                 ann[i] = {'string': chr(item['data'][0]),
                           'data': [item['data']],
@@ -296,8 +296,8 @@ class Decoder(srd.Decoder):
         args = self.trim_param_start(cache)
         i = 0
         for item in args:
-            if item['data'][0] in separators and \
-                    (len(ann) == 0 or ann[i]['type'] != 'separator'):
+            if (item['data'][0] in separators and
+                    (len(ann) == 0 or ann[i]['type'] != 'separator')):
                 i += 1
                 ann[i] = {'string': chr(item['data'][0]),
                           'data': [item['data']],
@@ -460,7 +460,7 @@ class Decoder(srd.Decoder):
         """
         return cache[2]['start'], cache[-2]['end']
 
-    def ann_cr(self, cache: list[dict], rxtx: int) -> tuple[int, int, list]:
+    def ann_cr(self, cache: list[dict], rxtx: int) -> tuple[int, int, list[list[str]]]:
         """
         Annotation for the terminator/CR byte.
 

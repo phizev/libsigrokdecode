@@ -162,6 +162,19 @@ commands = {
         'flow': 'TATA',
         'callback': 'handle_program_waveform_cmd',
     },
+    # Used by FlukeView to get a screenshot of the ScopeMeter.
+    'QG': {
+        'name': 'QG - UNDOCUMENTED',
+        'parameters': (
+            {
+                'name': 'UNDOCUMENTED',
+                'required': True,
+            },
+        ),
+        'flow': 'TAB',
+        'callback': 'handle_simple_cmd',
+        'response_callback': 'handle_plain_text',
+    },
     'QM': {
         'name': 'QUERY MEASUREMENT',
         'parameters': (
