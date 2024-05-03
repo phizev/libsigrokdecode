@@ -26,7 +26,7 @@ CR = 13
 
 
 class State:
-    NONE, BUFFERING_TX, BUFFERING_RX, PROCESSING, OUTPUT_READY = range(5)
+    BUFFERING_TX, BUFFERING_RX, PROCESSING = range(3)
 
 
 class Ann:
@@ -84,16 +84,18 @@ class Decoder(srd.Decoder):
     )
 
     def __init__(self):
-        self.out_ann = None
-        self.state = None
-        self.reset_required = None
-        self.progress = None
-        self.command_scope = None
-        self.cache = None
+        self.xfer_length = 0
         self.buffer = None
+        self.cache = None
+        self.command_scope = None
+        self.out_ann = None
+        self.progress = None
+        self.reset_required = None
+        self.state = None
         self.reset()
 
     def reset(self):
+        self.xfer_length = 0
         self.buffer = {TX: '', RX: ''}
         self.cache = {TX: [], RX: []}
         self.command_scope = None
@@ -121,10 +123,37 @@ class Decoder(srd.Decoder):
         # Buffer data until we get a terminator (CR).
         if (self.state == State.BUFFERING_TX and rxtx == TX) or (self.state == State.BUFFERING_RX and rxtx == RX):
             self.update_buffer(rxtx, startsample, endsample, pdata)
-            if pdata[0] == CR:
-                self.state = State.PROCESSING
+
+            if rxtx == TX:
+                # Buffer text data until we get a terminator (CR).
+                if pdata[0] == CR:
+                    self.state = State.PROCESSING
+                else:
+                    return
             else:
-                return
+                if self.cmd_xfer_type(self.command_scope) == 'BINARY':
+                    # We need at get to the first comma, then skip the first 2 bytes.
+                    # <ACK><CR><length ...><comma>
+                    # For binary data, buffer until the length is reached.
+                    # 10 is arbitrary, it's just to ensure we get the comma in the string
+                    if self.xfer_length == 0 and len(self.buffer[RX][2:]) > 5:
+                        binary_length, length_length = self.transfer_length(self.buffer[RX][2:])
+                        # It's + 2 to account for the comma, and checksum byte,
+                        self.xfer_length = binary_length + length_length + 2
+                        print(143, self.xfer_length)
+                    elif 0 < self.xfer_length <= len(self.buffer[RX][2:]):
+                        print(145, 'processing')
+                        print(146, len(self.buffer[RX][2:]))
+                        print(147, self.xfer_length)
+                        self.state = State.PROCESSING
+                    else:
+                        return
+                else:
+                    # Buffer text data until we get a terminator (CR).
+                    if pdata[0] == CR:
+                        self.state = State.PROCESSING
+                    else:
+                        return
 
         if self.state == State.PROCESSING:
             if rxtx == TX:
@@ -150,6 +179,14 @@ class Decoder(srd.Decoder):
             self.reset()
 
     def aput(self, start: int, end: int, data: list) -> None:
+        """
+        Wrapper function to avoid the third argument of put() on every use.
+
+        :param start: Start sample number
+        :param end: End sample number
+        :param data: The annotation for the sample run
+        :return:
+        """
         return self.put(start, end, self.out_ann, data)
 
     def update_buffer(self, rxtx: int, startsample: int, endsample: int, data: list) -> None:
@@ -167,7 +204,49 @@ class Decoder(srd.Decoder):
 
     def handle_response_code(self, cache: dict) -> tuple[int, int, list]:
         """
-        Annotation for the ack response code.
+        Handles the ack response code, resets the state if non-zero
+
+        :param cache: Transfer cache
+        :return: Annotation for response code
+        """
+        ack = chr(cache[RX][0]['data'][0])
+
+        # If ack is not zero, we have a problem, reset once output is done.
+        if ack != '0':
+            self.reset_required = True
+
+        return self.ann_response_code(cache)
+
+    def ann_cmd_details(self, command: str) -> list:
+        command_name = commands[command]['name']
+        return [Ann.COMMAND, [command_name + ' (' + command + ')', command_name, command]]
+
+    def ann_cmd_param(self, data: dict) -> tuple[int, int, list]:
+        return (data['start'], data['end'],
+                [Ann.PARAMETER, [data['param_name'] + ': ' + data['string'], data['string']]])
+
+    def ann_cmd_params(self, command: str) -> list:
+        command_name = commands[command]['name']
+        return [Ann.PARAMETERS, [command_name + ' parameters', command + ' param']]
+
+    def ann_cr(self, cache: list[dict], rxtx: int) -> tuple[int, int, list[list[str]]]:
+        """
+        Annotation for the terminator/CR byte.
+
+        :param cache: Cache for the current command scope.
+        :param rxtx: Whether the transfer is TX, or RX.
+        :return: Tuple for the annotation of the terminator/CR.
+        """
+        if rxtx == RX:
+            xdir = Ann.RX_CR
+        else:
+            xdir = Ann.TX_CR
+
+        return cache[rxtx][-1]['start'], cache[rxtx][-1]['end'], [xdir, ['<CR>', 'CR']]
+
+    def ann_response_code(self, cache: dict) -> tuple[int, int, list]:
+        """
+        Annotation for the ack response code
 
         :param cache: Transfer cache
         :return: Annotation for response code
@@ -182,31 +261,14 @@ class Decoder(srd.Decoder):
         item = cache[RX][0]
         ack = chr(item['data'][0])
 
-        if ack == '0':
+        if ack in status:
             response = status[ack]
         else:
-            # We have a problem, reset once output is done.
-            self.reset_required = True
-            if ack in status:
-                response = status[ack]
-            else:
-                response = 'Unknown Acknowledge'
+            response = 'Unknown Acknowledge'
 
         return item['start'], item['end'], [Ann.ACK, [response + ' (' + ack + ')', response, ack]]
 
-    def command_details(self, command: str) -> list:
-        command_name = commands[command]['name']
-        return [Ann.COMMAND, [command_name + ' (' + command + ')', command_name, command]]
-
-    def command_params(self, command: str) -> list:
-        command_name = commands[command]['name']
-        return [Ann.PARAMETERS, [command_name + ' parameters', command + ' param']]
-
-    def cmd_param_ann(self, data: dict) -> tuple[int, int, list]:
-        return (data['start'], data['end'],
-                [Ann.PARAMETER, [data['param_name'] + ': ' + data['string'], data['string']]])
-
-    def separator_ann(self, rxtx: int, data: dict) -> tuple[int, int, list]:
+    def ann_separator(self, rxtx: int, data: dict) -> tuple[int, int, list]:
         """
         Annotation for a separator.
 
@@ -246,7 +308,7 @@ class Decoder(srd.Decoder):
                         },
                         {
                             'name': 'Unit suffix',
-                        })
+                        },)
         # Response separators: comma
         comma = 44
         i = 0
@@ -284,7 +346,6 @@ class Decoder(srd.Decoder):
         return ann
 
     def cmd_v_present(self) -> bool:
-        print(287, chr(self.cache[TX][-1]['data'][0]).upper())
         return chr(self.cache[TX][-1]['data'][0]).upper() == 'V'
 
     def command_param_organise(self, command: str) -> dict:
@@ -333,41 +394,56 @@ class Decoder(srd.Decoder):
         for k in organised_params:
             item = organised_params[k]
             if item['type'] == 'separator':
-                annotations.append(self.separator_ann(TX, item))
+                annotations.append(self.ann_separator(TX, item))
             else:
-                annotations.append(self.cmd_param_ann(item))
+                annotations.append(self.ann_cmd_param(item))
         return annotations
 
-    def handle_plain_text(self) -> tuple[int, int, list]:
+    def handle_plain_text(self) -> list[tuple[int, int, list]]:
         """
         Annotation of a plain text response
 
         :return: Annotation tuple for a plain text response
         """
-        start, end = self.byte_run(self.cache[RX])
+        start, end = self.text_run(self.cache[RX])
         rx_string = self.buffer[RX][2:-1]
-        return start, end, [Ann.RX_DETAIL, [rx_string]]
+        return [(start, end, [Ann.RX_DETAIL, [rx_string]]), self.ann_cr(self.cache, RX)]
+
+    def handle_binary(self) -> list[tuple[int, int, list]]:
+        """
+        Annotation of a binary response
+
+        :return: Annotation tuples for a binary response.
+        """
+
+        start, end = self.text_run(self.cache[RX])
+        rx_string = self.buffer[RX][2:-1]
+        return [(start, end, [Ann.RX_DETAIL, [rx_string]])]
 
     def handle_program_waveform_cmd(self, rxtx: int) -> list[tuple[int, int, list]]:
         return self.handle_simple_cmd(rxtx)
 
-    def handle_query_measurement_rx(self) -> tuple[int, int, list]:
-
+    def handle_query_measurement_rx(self) -> list[tuple[int, int, list]]:
         return self.handle_plain_text()
 
-    def handle_query_print_rx(self) -> tuple[int, int, list]:
+    def handle_query_print_rx(self) -> list[tuple[int, int, list]]:
         return self.handle_plain_text()
 
-    def handle_query_setup_rx(self) -> tuple[int, int, list]:
-        start, end = self.byte_run(self.cache[RX])
+    def handle_query_setup_rx(self) -> list[tuple[int, int, list]]:
+        start, end = self.text_run(self.cache[RX])
         rx_string = self.buffer[RX][2:-1]
-        return start, end, [Ann.RX_DETAIL, [rx_string]]
+        return [(start, end, [Ann.RX_DETAIL, [rx_string]]), self.ann_cr(self.cache, RX)]
 
-    def handle_query_waveform_rx(self) -> tuple[int, int, list]:
+    def handle_query_waveform_rx(self) -> list[tuple[int, int, list]]:
         return self.handle_plain_text()
 
-    def handle_register_responses(self) -> tuple[int, int, list]:
-        start, end = self.byte_run(self.cache[RX])
+    def ann_register_responses(self) -> list[tuple[int, int, list]]:
+        """
+        Annotates the register responses for the IS, and ST queries.
+
+        :return: The register annotations
+        """
+        start, end = self.text_run(self.cache[RX])
         cache = self.cache[RX][2:-1]
         data = cache[0]['data'][1]
         message = []
@@ -391,7 +467,7 @@ class Decoder(srd.Decoder):
         else:
             rx_string = ', '.join(message)
 
-        return start, end, [Ann.RX_DETAIL, [rx_string]]
+        return [(start, end, [Ann.RX_DETAIL, [rx_string]]), self.ann_cr(self.cache, RX)]
 
     def handle_simple_cmd(self, rxtx: int) -> list[tuple[int, int, list]]:
         ann = []
@@ -400,12 +476,12 @@ class Decoder(srd.Decoder):
         cmd_flow = commands[command]['flow']
 
         if self.progress is None and rxtx is TX:
-            cmd_detail = self.command_details(command)
+            cmd_detail = self.ann_cmd_details(command)
             ann.append((cache[0]['start'], cache[1]['end'], cmd_detail))
 
             if len(self.buffer[TX]) > 3:
-                cmd_params = self.command_params(command)
-                start, end = self.byte_run(self.cache[TX])
+                cmd_params = self.ann_cmd_params(command)
+                start, end = self.text_run(self.cache[TX])
                 ann.append((start, end, cmd_params))
                 organised_params = self.command_param_organise(command)
                 param_details = self.cmd_param_format(organised_params)
@@ -429,13 +505,15 @@ class Decoder(srd.Decoder):
 
             elif self.progress == 'TA' and cmd_flow == 'TAR':
                 cmd_info = commands[command]
-                start, end = self.byte_run(self.cache[RX])
+                start, end = self.text_run(self.cache[RX])
                 ann.append((start, end, [Ann.RESPONSE, ['RX for ' + cmd_info['name'], 'RX for ' + command]]))
                 callback = commands.get(self.command_scope)['response_callback']
                 fn = getattr(self, callback)
                 annotations = fn()
-                ann.append(annotations)
-                ann.append(self.ann_cr(self.cache, RX))
+                if annotations is not None:
+                    for annotation in annotations:
+                        ann.append(annotation)
+
                 self.progress = 'TAR'
                 self.state = State.BUFFERING_RX
 
@@ -443,12 +521,11 @@ class Decoder(srd.Decoder):
                     self.state = State.BUFFERING_TX
                     self.reset_required = True
 
-            elif self.progress == 'TA' and cmd_flow == 'TATA':
-                True
+            # elif self.progress == 'TA' and cmd_flow == 'TATA':
 
         return ann
 
-    def byte_run(self, cache: list[dict]) -> tuple[int, int]:
+    def text_run(self, cache: list[dict]) -> tuple[int, int]:
         """
         Return the absolute first, and last index of the byte run for annotation length. This assumes
         the first 2 bytes, and last byte are not wanted.
@@ -460,17 +537,32 @@ class Decoder(srd.Decoder):
         """
         return cache[2]['start'], cache[-2]['end']
 
-    def ann_cr(self, cache: list[dict], rxtx: int) -> tuple[int, int, list[list[str]]]:
+    def cmd_xfer_type(self, command: str) -> str:
         """
-        Annotation for the terminator/CR byte.
+        Get the expected format of the response. ASCII is treated as a string, checking for a <CR> terminator.
+        Binary responses are formatted as <length>,<data><checksum> so we need to collect
+        <length> + 3 bytes of data in total.
 
-        :param cache: Cache for the current command scope.
-        :param rxtx: Whether the transfer is TX, or RX.
-        :return: Tuple for the annotation of the terminator/CR.
+        :param command: A 2 letter command.
+        :return: Whether the expected response is BINARY, or ASCII.
         """
-        if rxtx == 0:
-            xdir = Ann.RX_CR
+        if command in ['QP', 'QG']:
+            return 'BINARY'
         else:
-            xdir = Ann.TX_CR
+            return 'ASCII'
 
-        return cache[rxtx][-1]['start'], cache[rxtx][-1]['end'], [xdir, ['<CR>', 'CR']]
+    def transfer_length(self, string: str) -> tuple[int, int]:
+        """
+        Gets the length parameter of a transfer.
+
+        :param string: String of the form <length>,<data><checksum>.
+        :return: Tuple of the <length>, and length of the <length>.
+        """
+        items = string.split(',', 1)
+        if len(items) == 2:
+            return int(items[0]), len(items[0])
+
+        # if self.binary_length is None:
+        #     byte_length = int(self.buffer[RX][2:6]) + 8
+        # else:
+        #     return self.binary_length

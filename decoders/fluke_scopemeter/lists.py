@@ -18,6 +18,11 @@
 ##
 from collections import namedtuple
 
+# Key for command 'flow'
+# T - Transmit
+# A - ACK
+# R - Receive
+
 commands = {
     # Handles the situation where no command is sent, only the terminator.
     'NONE_CR': {
@@ -50,7 +55,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_plain_text'
+        'response_callback': 'handle_plain_text',
     },
     'DS': {
         'name': 'DEFAULT SETUP',
@@ -75,14 +80,14 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_plain_text'
+        'response_callback': 'handle_plain_text',
     },
     'IS': {
         'name': 'INSTRUMENT STATUS',
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_register_responses'
+        'response_callback': 'ann_register_responses',
     },
     'LL': {
         'name': 'LOCAL LOCKOUT',
@@ -101,23 +106,23 @@ commands = {
             {
                 'name': 'Parity',
                 'required': True,
-                'values': ('O', 'E', 'N')
+                'values': ('O', 'E', 'N'),
             },
             {
                 'name': 'Data bits',
                 'required': True,
-                'values': (7, 8)
+                'values': (7, 8),
             },
             {
                 'name': 'Stop bits',
                 'required': True,
-                'values': (1,)
+                'values': (1,),
             },
             {
                 'name': 'Handshake',
                 'required': False,
-                'values': ('XONXOFF',)
-            }
+                'values': ('XONXOFF',),
+            },
         ),
         'flow': 'TA',
         'callback': 'handle_simple_cmd',
@@ -128,12 +133,12 @@ commands = {
             {
                 'name': '1',
                 'required': True,
-                'values': ('1',)
+                'values': ('1',),
             },
             {
                 'name': 'Setup',
                 'required': True,
-            }
+            },
         ),
         'flow': 'TA',
         'callback': 'handle_simple_cmd',
@@ -151,13 +156,13 @@ commands = {
                            '114': 'Stored waveform 11', '115': 'Stored waveform 12', '116': 'Stored waveform 13',
                            '117': 'Stored waveform 14', '118': 'Stored waveform 15', '119': 'Stored waveform 16',
                            '120': 'Stored waveform 17', '121': 'Stored waveform 18', '122': 'Stored waveform 19',
-                           '123': 'Stored waveform 20'}
+                           '123': 'Stored waveform 20'},
             },
             {
                 'name': 'S',
                 'required': False,
-                'values': ('S',)
-            }
+                'values': ('S',),
+            },
         ),
         'flow': 'TATA',
         'callback': 'handle_program_waveform_cmd',
@@ -171,9 +176,9 @@ commands = {
                 'required': True,
             },
         ),
-        'flow': 'TAB',
+        'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_plain_text',
+        'response_callback': 'handle_binary',
     },
     'QM': {
         'name': 'QUERY MEASUREMENT',
@@ -185,26 +190,26 @@ commands = {
             {
                 'name': 'Values only',
                 'required': False,
-                'values': ('V',)
-            }
+                'values': ('V',),
+            },
         ),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_query_measurement_rx'
+        'response_callback': 'handle_query_measurement_rx',
     },
     'QP': {
         'name': 'QUERY PRINT',
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_query_print_rx'
+        'response_callback': 'handle_query_print_rx',
     },
     'QS': {
         'name': 'QUERY SETUP',
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_query_setup_rx'
+        'response_callback': 'handle_query_setup_rx',
     },
     'QW': {
         'name': 'QUERY WAVEFORM',
@@ -216,8 +221,8 @@ commands = {
             {
                 'name': 'Format option',
                 'required': False,
-                'values': ('V', 'S')
-            }
+                'values': ('V', 'S'),
+            },
         ),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
@@ -228,7 +233,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_plain_text'
+        'response_callback': 'handle_plain_text',
     },
     'RI': {
         'name': 'RESET INSTRUMENT',
@@ -242,7 +247,7 @@ commands = {
             {
                 'name': 'Setup register',
                 'required': True,
-            }
+            },
         ),
         'flow': 'TA',
         'callback': 'handle_simple_cmd',
@@ -252,7 +257,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_plain_text'
+        'response_callback': 'handle_plain_text',
     },
     'SS': {
         'name': 'SAVE SETUP',
@@ -260,7 +265,7 @@ commands = {
             {
                 'name': 'Setup register',
                 'required': True,
-            }
+            },
         ),
         'flow': 'TA',
         'callback': 'handle_simple_cmd',
@@ -270,7 +275,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_register_responses'
+        'response_callback': 'ann_register_responses',
     },
     'TA': {
         'name': 'TRIGGER ACQUISITION',
@@ -284,7 +289,7 @@ commands = {
             {
                 'name': 'View screen',
                 'required': True,
-            }
+            },
         ),
         'flow': 'TA',
         'callback': 'handle_simple_cmd',
@@ -295,7 +300,7 @@ commands = {
             {
                 'name': 'Date',
                 'required': True,
-            }
+            },
         ),
         'flow': 'TA',
         'callback': 'handle_simple_cmd',
@@ -306,7 +311,7 @@ commands = {
             {
                 'name': 'Time',
                 'required': True,
-            }
+            },
         ),
         'flow': 'TA',
         'callback': 'handle_simple_cmd',
