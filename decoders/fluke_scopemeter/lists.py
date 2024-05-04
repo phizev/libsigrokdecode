@@ -202,7 +202,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_query_print_rx',
+        'response_callback': 'handle_binary',
     },
     'QS': {
         'name': 'QUERY SETUP',
@@ -217,6 +217,16 @@ commands = {
             {
                 'name': 'Trace no',
                 'required': True,
+                'values': {'88': 'ScopeRecord INPUT A', '89': 'ScopeRecord INPUT B', '92': 'Max A', '93': 'Min A',
+                           '94': 'Max B', '95': 'Min B', '96': 'Max Trend', '97': 'Avg Trend', '98': 'Min Trend',
+                           '101': 'INPUT A', '102': 'INPUT B', '103': 'A +/- B', '104': 'Stored waveform 1',
+                           '105': 'Stored waveform 2', '106': 'Stored waveform 3', '107': 'Stored waveform 4',
+                           '108': 'Stored waveform 5', '109': 'Stored waveform 6', '110': 'Stored waveform 7',
+                           '111': 'Stored waveform 8', '112': 'Stored waveform 9', '113': 'Stored waveform 10',
+                           '114': 'Stored waveform 11', '115': 'Stored waveform 12', '116': 'Stored waveform 13',
+                           '117': 'Stored waveform 14', '118': 'Stored waveform 15', '119': 'Stored waveform 16',
+                           '120': 'Stored waveform 17', '121': 'Stored waveform 18', '122': 'Stored waveform 19',
+                           '123': 'Stored waveform 20'},
             },
             {
                 'name': 'Format option',
