@@ -55,7 +55,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_plain_text',
+        'response_callback': 'ann_plain_text',
     },
     'DS': {
         'name': 'DEFAULT SETUP',
@@ -80,7 +80,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_plain_text',
+        'response_callback': 'ann_plain_text',
     },
     'IS': {
         'name': 'INSTRUMENT STATUS',
@@ -143,7 +143,7 @@ commands = {
         'flow': 'TA',
         'callback': 'handle_simple_cmd',
     },
-    'PW': {
+    'PW': {  # Snowflake
         'name': 'PROGRAM WAVEFORM',
         'parameters': (
             {
@@ -159,7 +159,7 @@ commands = {
                            '123': 'Stored waveform 20'},
             },
             {
-                'name': 'S',
+                'name': 'Setup',
                 'required': False,
                 'values': ('S',),
             },
@@ -178,10 +178,11 @@ commands = {
         ),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_binary',
+        'response_callback': 'ann_binary',
     },
-    'QM': {
+    'QM': {  # Snowflake
         'name': 'QUERY MEASUREMENT',
+        # TODO handle SCOPE vs METER mode.
         'parameters': (
             {
                 'name': 'Field no',
@@ -202,7 +203,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_binary',
+        'response_callback': 'ann_binary',
     },
     'QS': {
         'name': 'QUERY SETUP',
@@ -211,7 +212,7 @@ commands = {
         'callback': 'handle_simple_cmd',
         'response_callback': 'handle_query_setup_rx',
     },
-    'QW': {
+    'QW': {  # Snowflake
         'name': 'QUERY WAVEFORM',
         'parameters': (
             {
@@ -243,7 +244,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_plain_text',
+        'response_callback': 'ann_plain_text',
     },
     'RI': {
         'name': 'RESET INSTRUMENT',
@@ -257,6 +258,11 @@ commands = {
             {
                 'name': 'Setup register',
                 'required': True,
+                #   1 to  40  for stored setups
+                #  61 to  70  for stored screen setups
+                #  92 to  99  for 'live traces' setups
+                # 101 to 103  for 'live traces' setups
+                # 104 to 123  for stored waveform setups
             },
         ),
         'flow': 'TA',
@@ -267,7 +273,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_plain_text',
+        'response_callback': 'ann_plain_text',
     },
     'SS': {
         'name': 'SAVE SETUP',
@@ -275,6 +281,9 @@ commands = {
             {
                 'name': 'Setup register',
                 'required': True,
+                #   1 to  40  for stored setups
+                # 101 to 103  for 'live traces' setups
+                # 104 to 123  for stored waveform setups
             },
         ),
         'flow': 'TA',
@@ -299,6 +308,8 @@ commands = {
             {
                 'name': 'View screen',
                 'required': True,
+                # 0  Exit View Screen mode
+                # 1 - 10  View Screen 1 - 10
             },
         ),
         'flow': 'TA',

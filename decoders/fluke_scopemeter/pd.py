@@ -217,6 +217,45 @@ class Decoder(srd.Decoder):
 
         return self.ann_response_code(cache)
 
+    def ann_binary(self) -> list[tuple[int, int, list]]:
+        """
+        Annotation of a binary response
+
+        :return: Annotation tuples for a binary response
+        """
+        buffer = self.buffer[RX]
+        cache = self.cache[RX]
+        command = self.command_scope
+
+        bin_length, len_length = self.transfer_length(buffer[2:])
+        start, end = self.text_run(cache[len_length + 1:])
+
+        length_string = [Ann.RX_LENGTH, ['Length: ' + str(bin_length), str(bin_length)]]
+        separator_string = [Ann.RX_SEPARATOR, ['Separator: ,', ',']]
+        separator_item = cache[len_length + 2]
+        rx_string = [commands[command]['name'] + ' binary response', command + ' binary RX', 'Binary']
+
+        return [(cache[2]['start'], cache[len_length + 1]['end'], length_string),
+                (separator_item['start'], separator_item['end'], separator_string),
+                (start, end, [Ann.RX_DETAIL, rx_string]),
+                self.ann_checksum(self.cache, RX)]
+
+    def ann_checksum(self, cache: list[dict], rxtx: int) -> tuple[int, int, list[list[str]]]:
+        """
+        Annotation for the checksum byte
+        TODO Compute, and verify checksum.
+
+        :param cache: Cache for the current command scope
+        :param rxtx: Whether the transfer is TX, or RX
+        :return: Tuple for the annotation of the checksum
+        """
+        if rxtx == RX:
+            xdir = Ann.RX_CHECKSUM
+        else:
+            xdir = Ann.TX_CHECKSUM
+
+        return cache[rxtx][-1]['start'], cache[rxtx][-1]['end'], [xdir, ['Checksum', 'Xsum']]
+
     def ann_cmd_details(self, command: str) -> list:
         command_name = commands[command]['name']
         return [Ann.COMMAND, [command_name + ' (' + command + ')', command_name, command]]
@@ -245,21 +284,15 @@ class Decoder(srd.Decoder):
 
         return cache[rxtx][index]['start'], cache[rxtx][index]['end'], [xdir, ['<CR>', 'CR']]
 
-    def ann_checksum(self, cache: list[dict], rxtx: int) -> tuple[int, int, list[list[str]]]:
+    def ann_plain_text(self) -> list[tuple[int, int, list]]:
         """
-        Annotation for the checksum byte
-        TODO Compute, and verify checksum.
+        Annotation of a plain text response
 
-        :param cache: Cache for the current command scope
-        :param rxtx: Whether the transfer is TX, or RX
-        :return: Tuple for the annotation of the checksum
+        :return: Annotation tuple for a plain text response
         """
-        if rxtx == RX:
-            xdir = Ann.RX_CHECKSUM
-        else:
-            xdir = Ann.TX_CHECKSUM
-
-        return cache[rxtx][-1]['start'], cache[rxtx][-1]['end'], [xdir, ['Checksum', 'Xsum']]
+        start, end = self.text_run(self.cache[RX])
+        rx_string = self.buffer[RX][2:-1]
+        return [(start, end, [Ann.RX_DETAIL, [rx_string]]), self.ann_cr(self.cache, RX)]
 
     def ann_register_responses(self) -> list[tuple[int, int, list]]:
         """
@@ -451,47 +484,14 @@ class Decoder(srd.Decoder):
                 annotations.append(self.ann_cmd_param(item))
         return annotations
 
-    def handle_plain_text(self) -> list[tuple[int, int, list]]:
-        """
-        Annotation of a plain text response
-
-        :return: Annotation tuple for a plain text response
-        """
-        start, end = self.text_run(self.cache[RX])
-        rx_string = self.buffer[RX][2:-1]
-        return [(start, end, [Ann.RX_DETAIL, [rx_string]]), self.ann_cr(self.cache, RX)]
-
-    def handle_binary(self) -> list[tuple[int, int, list]]:
-        """
-        Annotation of a binary response
-
-        :return: Annotation tuples for a binary response.
-        """
-        buffer = self.buffer[RX]
-        cache = self.cache[RX]
-        command = self.command_scope
-
-        bin_length, len_length = self.transfer_length(buffer[2:])
-        start, end = self.text_run(cache[len_length + 1:])
-
-        length_string = [Ann.RX_LENGTH, ['Length: ' + str(bin_length), str(bin_length)]]
-        separator_string = [Ann.RX_SEPARATOR, ['Separator: ,', ',']]
-        separator_item = cache[len_length + 2]
-        rx_string = [commands[command]['name'] + ' binary response', command + ' binary RX', 'Binary']
-
-        return [(cache[2]['start'], cache[len_length + 1]['end'], length_string),
-                (separator_item['start'], separator_item['end'], separator_string),
-                (start, end, [Ann.RX_DETAIL, rx_string]),
-                self.ann_checksum(self.cache, RX)]
-
     def handle_program_waveform_cmd(self, rxtx: int) -> list[tuple[int, int, list]]:
+        # TODO PW snowflake
         return self.handle_simple_cmd(rxtx)
 
     def handle_query_measurement_rx(self) -> list[tuple[int, int, list]]:
-        return self.handle_plain_text()
-
-    def handle_query_print_rx(self) -> list[tuple[int, int, list]]:
-        return self.handle_plain_text()
+        # TODO QM snowflake
+        # Handle SCOPE vs METER mode
+        return self.ann_plain_text()
 
     def handle_query_setup_rx(self) -> list[tuple[int, int, list]]:
         start, end = self.text_run(self.cache[RX])
@@ -499,7 +499,8 @@ class Decoder(srd.Decoder):
         return [(start, end, [Ann.RX_DETAIL, [rx_string]]), self.ann_cr(self.cache, RX)]
 
     def handle_query_waveform_rx(self) -> list[tuple[int, int, list]]:
-        return self.handle_plain_text()
+        # TODO QW snowflake
+        return self.ann_plain_text()
 
     def handle_simple_cmd(self, rxtx: int) -> list[tuple[int, int, list]]:
         ann = []
