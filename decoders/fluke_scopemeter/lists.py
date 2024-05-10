@@ -23,6 +23,100 @@ from collections import namedtuple
 # A - ACK
 # R - Receive
 
+# SAVE SETUP (SS)
+SS_setups = {}
+for i in range(1, 41):
+    SS_setups[str(i)] = 'Stored setup ' + str(i)
+SS_setups += {'101': 'Live trace setup',
+              '102': 'Live trace setup',
+              '103': 'Live trace setup'}
+for i in range(1, 21):
+    SS_setups[str(103 + i)] = 'Stored waveform setup ' + str(i)
+
+# RECALL SETUP (RS)
+RS_setups = SS_setups
+for i in range(1, 11):
+    RS_setups[str(60 + i)] = 'Stored screen setup ' + str(i)
+for i in range(1, 9):
+    RS_setups[str(91 + i)] = 'Live trace setup'
+
+# PROGRAM WAVEFORM (PW) traces
+PW_traces = {'101': 'INPUT A', '102': 'INPUT B', '103': 'A +/- B'}
+for i in range(1, 21):
+    PW_traces[str(103 + i)] = 'Stored waveform ' + str(i)
+
+# QUERY WAVEFORM (QW) traces
+QW_traces = {'88': 'ScopeRecord INPUT A',
+             '89': 'ScopeRecord INPUT B',
+             '92': 'Max A',
+             '93': 'Min A',
+             '94': 'Max B',
+             '95': 'Min B',
+             '96': 'Max Trend',
+             '97': 'Avg Trend',
+             '98': 'Min Trend'}
+QW_traces += PW_traces
+
+# VIEW SCREEN (VS)
+VS_screens = {'0': 'Exit View Screen mode'}
+for i in range(1, 11):
+    VS_screens[str(i)] = 'View screen ' + str(i)
+
+# QUERY MEASUREMENT (QM) Scope mode parameters
+QMScopeField = namedtuple('QMScopeField', 'field_no, mtype, desc')
+QMScopeField.__doc__ += ': Command parameter values for QM in scope mode'
+QMScopeField.field_no.__doc__ = 'Field number for field_no parameter'
+QMScopeField.mtype.__doc__ = 'Measurement type'
+QMScopeField.desc.__doc__ = 'Description of the measurement'
+
+QM_scope_field_no = (
+    QMScopeField(1, 'dV', 'Voltage between cursors'),
+    QMScopeField(2, 'dt', 'Time between cursors'),
+    QMScopeField(3, '1/dt', 'Reciprocal of field no 2'),
+    QMScopeField(4, 't1 from TRIG', 'Trigger to cursor left'),
+    QMScopeField(5, 'RMS', 'RMS value'),
+    QMScopeField(6, 'MEAN', 'MEAN value'),
+    QMScopeField(7, 'P-P', 'Peak to Peak voltage'),
+    QMScopeField(8, 'MAX-P', 'Maximum peak voltage'),
+    QMScopeField(9, 'MIN-P', 'Minimum peak voltage'),
+    QMScopeField(10, 'FREQ', 'Signal frequency'),
+    QMScopeField(11, 'RISE', 'Rise time (10% to 90%)'),
+    QMScopeField(12, 'PHASE src>des1', 'Phase src to destination'),
+    QMScopeField(13, 'PHASE src>des2', 'Phase src to destination'),
+    QMScopeField(14, 'PHASE src>des3', 'Phase src to destination'),
+    QMScopeField(15, 'V1', 'Voltage at cursor left'),
+    QMScopeField(16, 'V2', 'Voltage at cursor right'),
+    QMScopeField(17, 't2 from TRIG', 'Trigger to cursor right'),
+    QMScopeField(18, 't1 from START', 'Time from start to cursor left'),
+    QMScopeField(19, 't2 from START', 'Time from start to cursor right'),
+    QMScopeField(20, 't1 time of day', 'Real time stamp at cursor left'),
+    QMScopeField(21, 't2 time of day', 'Real time stamp at cursor right'),
+)
+
+# QUERY MEASUREMENT (QM) Meter mode parameters
+QMMeterField = namedtuple('QMScopeField', 'field_no, desc')
+QMMeterField.__doc__ += ': Command parameter values for QM in meter mode'
+QMMeterField.field_no.__doc__ = 'Field number for field_no parameter'
+QMMeterField.desc.__doc__ = 'Description of the measurement'
+
+QM_meter_field_no = (
+    QMMeterField(1, 'First measurement result'),
+    QMMeterField(2, 'Second measurement result'),
+    QMMeterField(3, 'First calculated result'),
+    QMMeterField(4, 'Maximum (record) result'),
+    QMMeterField(5, 'Average (record) result'),
+    QMMeterField(6, 'Minimum (record) result'),
+    QMMeterField(7, 'Time stamp of last recorded maximum'),
+    QMMeterField(8, 'Time stamp of last recorded average'),
+    QMMeterField(9, 'Time stamp of last recorded minimum'),
+    QMMeterField(10, 'Third measurement result'),
+    QMMeterField(11, 'Fourth measurement result'),
+    QMMeterField(12, 'Record MAX-MIN'),
+    QMMeterField(13, 'Time and date stamp of last recorded maximum'),
+    QMMeterField(14, 'Time and date stamp of last recorded average'),
+    QMMeterField(15, 'Time and date stamp of last recorded minimum'),
+)
+
 commands = {
     # Handles the situation where no command is sent, only the terminator.
     'NONE_CR': {
@@ -149,14 +243,7 @@ commands = {
             {
                 'name': 'Trace no',
                 'required': True,
-                'values': {'101': 'INPUT A', '102': 'INPUT B', '103': 'A +/- B', '104': 'Stored waveform 1',
-                           '105': 'Stored waveform 2', '106': 'Stored waveform 3', '107': 'Stored waveform 4',
-                           '108': 'Stored waveform 5', '109': 'Stored waveform 6', '110': 'Stored waveform 7',
-                           '111': 'Stored waveform 8', '112': 'Stored waveform 9', '113': 'Stored waveform 10',
-                           '114': 'Stored waveform 11', '115': 'Stored waveform 12', '116': 'Stored waveform 13',
-                           '117': 'Stored waveform 14', '118': 'Stored waveform 15', '119': 'Stored waveform 16',
-                           '120': 'Stored waveform 17', '121': 'Stored waveform 18', '122': 'Stored waveform 19',
-                           '123': 'Stored waveform 20'},
+                'values': PW_traces,
             },
             {
                 'name': 'Setup',
@@ -183,17 +270,32 @@ commands = {
     'QM': {  # Snowflake
         'name': 'QUERY MEASUREMENT',
         # TODO handle SCOPE vs METER mode.
-        'parameters': (
-            {
-                'name': 'Field no',
-                'required': True,
-            },
-            {
-                'name': 'Values only',
-                'required': False,
-                'values': ('V',),
-            },
-        ),
+        'parameters': {
+            'scope_mode': (
+                {
+                    'name': 'Field no',
+                    'required': True,
+                    'values': QM_scope_field_no,
+                },
+                {
+                    'name': 'Values only',
+                    'required': False,
+                    'values': ('V',),
+                },
+            ),
+            'meter_mode': (
+                {
+                    'name': 'Field no',
+                    'required': True,
+                    'values': QM_meter_field_no,
+                },
+                {
+                    'name': 'Values only',
+                    'required': False,
+                    'values': ('V',),
+                },
+            ),
+        },
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
         'response_callback': 'handle_query_measurement_rx',
@@ -218,16 +320,7 @@ commands = {
             {
                 'name': 'Trace no',
                 'required': True,
-                'values': {'88': 'ScopeRecord INPUT A', '89': 'ScopeRecord INPUT B', '92': 'Max A', '93': 'Min A',
-                           '94': 'Max B', '95': 'Min B', '96': 'Max Trend', '97': 'Avg Trend', '98': 'Min Trend',
-                           '101': 'INPUT A', '102': 'INPUT B', '103': 'A +/- B', '104': 'Stored waveform 1',
-                           '105': 'Stored waveform 2', '106': 'Stored waveform 3', '107': 'Stored waveform 4',
-                           '108': 'Stored waveform 5', '109': 'Stored waveform 6', '110': 'Stored waveform 7',
-                           '111': 'Stored waveform 8', '112': 'Stored waveform 9', '113': 'Stored waveform 10',
-                           '114': 'Stored waveform 11', '115': 'Stored waveform 12', '116': 'Stored waveform 13',
-                           '117': 'Stored waveform 14', '118': 'Stored waveform 15', '119': 'Stored waveform 16',
-                           '120': 'Stored waveform 17', '121': 'Stored waveform 18', '122': 'Stored waveform 19',
-                           '123': 'Stored waveform 20'},
+                'values': QW_traces,
             },
             {
                 'name': 'Format option',
@@ -258,11 +351,7 @@ commands = {
             {
                 'name': 'Setup register',
                 'required': True,
-                #   1 to  40  for stored setups
-                #  61 to  70  for stored screen setups
-                #  92 to  99  for 'live traces' setups
-                # 101 to 103  for 'live traces' setups
-                # 104 to 123  for stored waveform setups
+                'values': RS_setups
             },
         ),
         'flow': 'TA',
@@ -281,9 +370,7 @@ commands = {
             {
                 'name': 'Setup register',
                 'required': True,
-                #   1 to  40  for stored setups
-                # 101 to 103  for 'live traces' setups
-                # 104 to 123  for stored waveform setups
+                'values': SS_setups,
             },
         ),
         'flow': 'TA',
@@ -308,8 +395,7 @@ commands = {
             {
                 'name': 'View screen',
                 'required': True,
-                # 0  Exit View Screen mode
-                # 1 - 10  View Screen 1 - 10
+                'values': VS_screens,
             },
         ),
         'flow': 'TA',
@@ -368,57 +454,4 @@ status_query_data = (
     RegBit(6, 64, 'Wrong number of data bits'),
     RegBit(9, 512, 'Conflicting instrument settings'),
     RegBit(14, 16384, 'Checksum error'),
-)
-
-QMScopeField = namedtuple('QMScopeField', 'field_no, mtype, desc')
-QMScopeField.__doc__ += ': Command parameter values for QM in scope mode'
-QMScopeField.field_no.__doc__ = 'Field number for field_no parameter'
-QMScopeField.mtype.__doc__ = 'Measurement type'
-QMScopeField.desc.__doc__ = 'Description of the measurement'
-
-tx_qm_scope_field_no = (
-    QMScopeField(1, 'dV', 'Voltage between cursors'),
-    QMScopeField(2, 'dt', 'Time between cursors'),
-    QMScopeField(3, '1/dt', 'Reciprocal of field no 2'),
-    QMScopeField(4, 't1 from TRIG', 'Trigger to cursor left'),
-    QMScopeField(5, 'RMS', 'RMS value'),
-    QMScopeField(6, 'MEAN', 'MEAN value'),
-    QMScopeField(7, 'P-P', 'Peak to Peak voltage'),
-    QMScopeField(8, 'MAX-P', 'Maximum peak voltage'),
-    QMScopeField(9, 'MIN-P', 'Minimum peak voltage'),
-    QMScopeField(10, 'FREQ', 'Signal frequency'),
-    QMScopeField(11, 'RISE', 'Rise time (10% to 90%)'),
-    QMScopeField(12, 'PHASE src>des1', 'Phase src to destination'),
-    QMScopeField(13, 'PHASE src>des2', 'Phase src to destination'),
-    QMScopeField(14, 'PHASE src>des3', 'Phase src to destination'),
-    QMScopeField(15, 'V1', 'Voltage at cursor left'),
-    QMScopeField(16, 'V2', 'Voltage at cursor right'),
-    QMScopeField(17, 't2 from TRIG', 'Trigger to cursor right'),
-    QMScopeField(18, 't1 from START', 'Time from start to cursor left'),
-    QMScopeField(19, 't2 from START', 'Time from start to cursor right'),
-    QMScopeField(20, 't1 time of day', 'Real time stamp at cursor left'),
-    QMScopeField(21, 't2 time of day', 'Real time stamp at cursor right'),
-)
-
-QMMeterField = namedtuple('QMScopeField', 'field_no, desc')
-QMMeterField.__doc__ += ': Command parameter values for QM in meter mode'
-QMMeterField.field_no.__doc__ = 'Field number for field_no parameter'
-QMMeterField.desc.__doc__ = 'Description of the measurement'
-
-tx_qm_meter_field_no = (
-    QMMeterField(1, 'First measurement result'),
-    QMMeterField(2, 'Second measurement result'),
-    QMMeterField(3, 'First calculated result'),
-    QMMeterField(4, 'Maximum (record) result'),
-    QMMeterField(5, 'Average (record) result'),
-    QMMeterField(6, 'Minimum (record) result'),
-    QMMeterField(7, 'Time stamp of last recorded maximum'),
-    QMMeterField(8, 'Time stamp of last recorded average'),
-    QMMeterField(9, 'Time stamp of last recorded minimum'),
-    QMMeterField(10, 'Third measurement result'),
-    QMMeterField(11, 'Fourth measurement result'),
-    QMMeterField(12, 'Record MAX-MIN'),
-    QMMeterField(13, 'Time and date stamp of last recorded maximum'),
-    QMMeterField(14, 'Time and date stamp of last recorded average'),
-    QMMeterField(15, 'Time and date stamp of last recorded minimum'),
 )

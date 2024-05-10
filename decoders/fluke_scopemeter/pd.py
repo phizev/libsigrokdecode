@@ -137,13 +137,13 @@ class Decoder(srd.Decoder):
                     return
             else:
                 if self.cmd_xfer_type(self.command_scope) == 'BINARY':
-                    # We need at get to the first comma, then skip the first 2 bytes.
+                    # We need to get to the first comma, then skip the first 2 bytes to get the length.
                     # <ACK><CR><length ...><comma>
-                    # For binary data, buffer until the length is reached.
-                    # 5 is arbitrary, it's just to ensure we get the comma in the string
-                    if self.xfer_length == 0 and len(self.buffer[RX][2:]) > 5:
-                        binary_length, length_length = self.transfer_length(self.buffer[RX][2:])
-                        self.xfer_length = binary_length + length_length + 1
+                    # For binary data, buffer until that length is reached.
+                    # 8 is arbitrary, it's just to ensure we get the comma in the string.
+                    if self.xfer_length == 0 and len(self.buffer[RX][2:]) > 8:
+                        bin_length, len_length = self.transfer_length(self.buffer[RX][2:])
+                        self.xfer_length = bin_length + len_length + 1
                     elif 0 < self.xfer_length <= len(self.buffer[RX][2:]):
                         self.state = State.PROCESSING
                     else:
