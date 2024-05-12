@@ -31,7 +31,8 @@ class State:
 
 class Ann:
     (COMMAND, PARAMETER, PARAMETERS, SEPARATOR, TX_CR, RX_CR, ACK, TX_ERROR, RX_ERROR, RX_SEPARATOR, RX_DETAIL,
-     RESPONSE, TX_SCOPE, TX_METER, RX_SCOPE, RX_METER, TX_CHECKSUM, RX_CHECKSUM, TX_LENGTH, RX_LENGTH) = range(20)
+     RESPONSE, TX_SCOPE, TX_METER, RX_SCOPE, RX_METER, TX_CS, RX_CS, TX_CS_ERR, RX_CS_ERR, TX_LENGTH, RX_LENGTH) \
+        = range(22)
 
 
 # noinspection PyMethodMayBeStatic
@@ -72,18 +73,20 @@ class Decoder(srd.Decoder):
         ('tx-meter-detail', 'TX meter mode'),
         ('rx-scope-detail', 'RX scope mode'),
         ('rx-meter-detail', 'RX meter mode'),
-        ('tx-checksum', 'Checksum'),
-        ('rx-checksum', 'Checksum'),
+        ('tx-cs', 'Checksum OK'),
+        ('rx-cs', 'Checksum OK'),
+        ('tx-cs-err', 'Checksum Error'),
+        ('rx-cs-err', 'Checksum Error'),
         ('tx-length', 'Length'),
         ('rx-length', 'Length'),
     )
     annotation_rows = (
         ('tx-scope-details', 'TX scope mode', (Ann.TX_SCOPE,)),
         ('tx-meter-details', 'TX meter mode', (Ann.TX_METER,)),
-        ('tx-details', 'Command details', (Ann.PARAMETER, Ann.SEPARATOR, Ann.TX_CHECKSUM, Ann.TX_LENGTH)),
+        ('tx-details', 'Command details', (Ann.PARAMETER, Ann.SEPARATOR, Ann.TX_CS, Ann.TX_CS_ERR, Ann.TX_LENGTH)),
         ('commands', 'Commands', (Ann.COMMAND, Ann.PARAMETERS, Ann.TX_CR, Ann.TX_ERROR)),
         ('responses', 'Responses', (Ann.RX_CR, Ann.ACK, Ann.RX_ERROR, Ann.RESPONSE)),
-        ('rx-details', 'Response details', (Ann.RX_SEPARATOR, Ann.RX_DETAIL, Ann.RX_CHECKSUM, Ann.RX_LENGTH)),
+        ('rx-details', 'Response details', (Ann.RX_SEPARATOR, Ann.RX_DETAIL, Ann.RX_CS, Ann.RX_CS_ERR, Ann.RX_LENGTH)),
         ('rx-scope-details', 'RX scope mode', (Ann.RX_SCOPE,)),
         ('rx-meter-details', 'RX meter mode', (Ann.RX_METER,)),
     )
@@ -238,23 +241,32 @@ class Decoder(srd.Decoder):
         return [(cache[2]['start'], cache[len_length + 1]['end'], length_string),
                 (separator_item['start'], separator_item['end'], separator_string),
                 (start, end, [Ann.RX_DETAIL, rx_string]),
-                self.ann_checksum(self.cache, RX)]
+                self.ann_checksum(self.cache, buffer[len_length + 3:-1], RX)]
 
-    def ann_checksum(self, cache: list[dict], rxtx: int) -> tuple[int, int, list[list[str]]]:
+    def ann_checksum(self, cache: list[dict], buffer: str, rxtx: int) -> tuple[int, int, list[list[str]]]:
         """
         Annotation for the checksum byte
-        TODO Compute, and verify checksum.
 
         :param cache: Cache for the current command scope
+        :param buffer: The string used for the checksum calculation
         :param rxtx: Whether the transfer is TX, or RX
         :return: Tuple for the annotation of the checksum
         """
-        if rxtx == RX:
-            xdir = Ann.RX_CHECKSUM
-        else:
-            xdir = Ann.TX_CHECKSUM
 
-        return cache[rxtx][-1]['start'], cache[rxtx][-1]['end'], [xdir, ['Checksum', 'Xsum']]
+        if self.calc_checksum(buffer) == cache[rxtx][-1]['data'][0]:
+            result = 'OK'
+            if rxtx == RX:
+                xdir = Ann.RX_CS
+            else:
+                xdir = Ann.TX_CS
+        else:
+            result = 'Error'
+            if rxtx == RX:
+                xdir = Ann.RX_CS_ERR
+            else:
+                xdir = Ann.TX_CS_ERR
+
+        return cache[rxtx][-1]['start'], cache[rxtx][-1]['end'], [xdir, ['Checksum ' + result, 'Xsum ' + result]]
 
     def ann_cmd_details(self, command: str) -> list:
         command_name = commands[command]['name']
@@ -488,17 +500,17 @@ class Decoder(srd.Decoder):
         # TODO PW snowflake
         return self.handle_simple_cmd(rxtx)
 
-    def handle_query_measurement_rx(self) -> list[tuple[int, int, list]]:
+    def ann_query_measurement_rx(self) -> list[tuple[int, int, list]]:
         # TODO QM snowflake
         # Handle SCOPE vs METER mode
         return self.ann_plain_text()
 
-    def handle_query_setup_rx(self) -> list[tuple[int, int, list]]:
+    def ann_query_setup_rx(self) -> list[tuple[int, int, list]]:
         start, end = self.text_run(self.cache[RX])
         rx_string = self.buffer[RX][2:-1]
         return [(start, end, [Ann.RX_DETAIL, [rx_string]]), self.ann_cr(self.cache, RX)]
 
-    def handle_query_waveform_rx(self) -> list[tuple[int, int, list]]:
+    def ann_query_waveform_rx(self) -> list[tuple[int, int, list]]:
         # TODO QW snowflake
         return self.ann_plain_text()
 
@@ -532,10 +544,6 @@ class Decoder(srd.Decoder):
                 self.progress = 'TA'
                 self.state = State.BUFFERING_RX
 
-                if self.progress == cmd_flow:
-                    self.state = State.BUFFERING_TX
-                    self.reset_required = True
-
             elif self.progress == 'TA' and cmd_flow == 'TAR':
                 cmd_info = commands[command]
                 if self.cmd_xfer_type(command) == 'ASCII':
@@ -552,9 +560,9 @@ class Decoder(srd.Decoder):
 
                 self.progress = 'TAR'
 
-                if self.progress == cmd_flow:
-                    self.state = State.BUFFERING_TX
-                    self.reset_required = True
+            if self.progress == cmd_flow:
+                self.state = State.BUFFERING_TX
+                self.reset_required = True
 
             # elif self.progress == 'TA' and cmd_flow == 'TATA':
 
@@ -607,3 +615,15 @@ class Decoder(srd.Decoder):
         items = string.split(',', 1)
         if len(items) == 2:
             return int(items[0]), len(items[0])
+
+    def calc_checksum(self, string: str) -> int:
+        """
+        Calculates a checksum for a given string.
+
+        :param string: The string to calculate the checksum for.
+        :return: The calculated checksum.
+        """
+        cs = 0
+        for char in string:
+            cs = (cs + ord(char)) & 255
+        return cs

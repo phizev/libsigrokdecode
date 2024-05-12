@@ -25,25 +25,25 @@ from collections import namedtuple
 
 # SAVE SETUP (SS)
 SS_setups = {}
-for i in range(1, 41):
-    SS_setups[str(i)] = 'Stored setup ' + str(i)
-SS_setups += {'101': 'Live trace setup',
-              '102': 'Live trace setup',
-              '103': 'Live trace setup'}
-for i in range(1, 21):
-    SS_setups[str(103 + i)] = 'Stored waveform setup ' + str(i)
+for idx in range(1, 41):
+    SS_setups[str(idx)] = 'Stored setup ' + str(idx)
+SS_setups.update({'101': 'Live trace setup',
+                  '102': 'Live trace setup',
+                  '103': 'Live trace setup'})
+for idx in range(1, 21):
+    SS_setups[str(103 + idx)] = 'Stored waveform setup ' + str(idx)
 
 # RECALL SETUP (RS)
 RS_setups = SS_setups
-for i in range(1, 11):
-    RS_setups[str(60 + i)] = 'Stored screen setup ' + str(i)
-for i in range(1, 9):
-    RS_setups[str(91 + i)] = 'Live trace setup'
+for idx in range(1, 11):
+    RS_setups[str(60 + idx)] = 'Stored screen setup ' + str(idx)
+for idx in range(1, 9):
+    RS_setups[str(91 + idx)] = 'Live trace setup'
 
 # PROGRAM WAVEFORM (PW) traces
 PW_traces = {'101': 'INPUT A', '102': 'INPUT B', '103': 'A +/- B'}
-for i in range(1, 21):
-    PW_traces[str(103 + i)] = 'Stored waveform ' + str(i)
+for idx in range(1, 21):
+    PW_traces[str(103 + idx)] = 'Stored waveform ' + str(idx)
 
 # QUERY WAVEFORM (QW) traces
 QW_traces = {'88': 'ScopeRecord INPUT A',
@@ -55,12 +55,12 @@ QW_traces = {'88': 'ScopeRecord INPUT A',
              '96': 'Max Trend',
              '97': 'Avg Trend',
              '98': 'Min Trend'}
-QW_traces += PW_traces
+QW_traces.update(PW_traces)
 
 # VIEW SCREEN (VS)
 VS_screens = {'0': 'Exit View Screen mode'}
-for i in range(1, 11):
-    VS_screens[str(i)] = 'View screen ' + str(i)
+for idx in range(1, 11):
+    VS_screens[str(idx)] = 'View screen ' + str(idx)
 
 # QUERY MEASUREMENT (QM) Scope mode parameters
 QMScopeField = namedtuple('QMScopeField', 'field_no, mtype, desc')
@@ -269,7 +269,6 @@ commands = {
     },
     'QM': {  # Snowflake
         'name': 'QUERY MEASUREMENT',
-        # TODO handle SCOPE vs METER mode.
         'parameters': {
             'scope_mode': (
                 {
@@ -298,7 +297,7 @@ commands = {
         },
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_query_measurement_rx',
+        'response_callback': 'ann_query_measurement_rx',
     },
     'QP': {
         'name': 'QUERY PRINT',
@@ -312,7 +311,7 @@ commands = {
         'parameters': (),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_query_setup_rx',
+        'response_callback': 'ann_query_setup_rx',
     },
     'QW': {  # Snowflake
         'name': 'QUERY WAVEFORM',
@@ -330,7 +329,7 @@ commands = {
         ),
         'flow': 'TAR',
         'callback': 'handle_simple_cmd',
-        'response_callback': 'handle_query_waveform_rx',
+        'response_callback': 'ann_query_waveform_rx',
     },
     'RD': {
         'name': 'READ DATE',
